@@ -1,5 +1,6 @@
 const PROBABILITY_OF_KEEPING_DIRECTION = 0.6;
 const SEGMENT_LENGTH = 50;
+const PERSON_SIZE = SEGMENT_LENGTH/5;
 const ANIMATION_SPEED = 30;
 
 const NUMBER_OF_STREETS = 50;
@@ -8,8 +9,10 @@ let currentSreetLength = 0;
 const MAX_STREET_LENGTH = 10;
 
 let actors = [];
-const NUMBER_OF_ACTORS = 10;
+let enableMoveActors = true;
+const NUMBER_OF_ACTORS = 50;
 const ACTOR_STEP_LENGTH = 1;
+const CHANCE_OF_CONTRACTING_DISEASE = 1;
 
 const SHOW_STREET_COORDINATES = false;
 
@@ -143,7 +146,7 @@ function recordPoints(currentPoint, nextPoint){
     points[currentPoint] = [nextPoint];
   }
 
-  if(points[nextPoint] && !points[nextPoint].includes(currentPoint)){
+  if(points[nextPoint]){
     if(!points[nextPoint].includes(currentPoint)){
       points[nextPoint].push(currentPoint)
     }
@@ -161,9 +164,9 @@ function pointStringToArray(str){
   return [Number(coords[0]), Number(coords[1])];
 }
 
-//
 
 function init(){
+    registerKeyListener();
     generateStreets(NUMBER_OF_STREETS);
     createActors(NUMBER_OF_ACTORS);
     draw();
@@ -172,10 +175,21 @@ function init(){
 
 function draw(){
     clear();
-    moveActors();
+    if(enableMoveActors){
+      moveActors();
+    }
     drawBackground();
     drawStreets();
     drawActors();
+    infect();
+}
+
+function registerKeyListener() {
+  window.addEventListener('keydown', (e) => {
+    if(event.which == 32){
+      enableMoveActors = !enableMoveActors;
+    }
+  });
 }
 
 function drawStreets(){
@@ -195,14 +209,39 @@ function drawOneStreet(startPoint, endPoint){
   circle(x1, y1, 3, "orange")
 
   if(SHOW_STREET_COORDINATES){
-    text(`${x2}, ${y2}`, x2-20, y2-10, 10, "orange")  
+    text(`${x2}, ${y2}`, x2-20, y2-10, 10, "orange")
+    text(`${points[endPoint].length}`, x2-10, y2+10, 10, "orange")    
   } 
 }
 
 function drawActors(){
   actors.forEach((actor) => {
-    circle(actor.x, actor.y, 10, "#26ff6b");
+    const color = actor.infected ? "#ff0f2f" : "#26ff6b";
+    circle(actor.x, actor.y, PERSON_SIZE, color);
   })
+}
+
+function infect(){
+  let checked = {}; // keep track of which pairs we've checked already;
+
+  actors.forEach((actor1) => {
+    actors.forEach((actor2) => {
+
+      if(actor1.id !== actor2.id && typeof(checked[`${actor1.id},${actor2.id}`]) == 'undefined'){
+        checked[`${actor1.id},${actor2.id}`] = true;
+
+        if(distanceBetween(actor1.x, actor1.y, actor2.x, actor2.y) < PERSON_SIZE){
+          if(actor1.infected || actor2.infected) {
+            if(Math.random() <= CHANCE_OF_CONTRACTING_DISEASE){
+              actor1.infected = true;
+              actor2.infected = true;
+            }
+          }
+        }
+      }
+    });
+  });
+
 }
 
 // actors
@@ -219,8 +258,11 @@ function createActors(numberOfActors){
 function createNewActor() {
   const [x, y] = pointStringToArray(pickRandomStartingPoint());
   actors.push({
+    id: actors.length + 1,
     x: x,
     y: y,
+    infected: (Math.random() < 0.1) ? true :false,
+    lastVisitedPoint: `${x},${y}`,
     destination: "",
   });
 }
@@ -239,9 +281,25 @@ function moveActors(){
 function moveActor(actor) {
   const allPoints = Object.keys(points);
   const currentLocation = `${actor.x},${actor.y}`;
+  let availablePoints = [];
 
   if(allPoints.includes(currentLocation) || (actor.destination.length == 0)){
-    actor.destination = getRandomElement(points[currentLocation]);
+    
+    /* TODO: this is a band aid! Need to figure out actual destination */    
+
+    if(points[currentLocation].length > 1){
+      availablePoints = points[currentLocation].filter((possibleOption) => {
+        return possibleOption != actor.lastVisitedPoint;
+      });
+    } else {
+      availablePoints = points[currentLocation];
+    }
+
+    if(allPoints.includes(currentLocation)){ 
+      actor.lastVisitedPoint = currentLocation;
+    }   
+
+    actor.destination = getRandomElement(availablePoints);
   }
 
   let [nextX, nextY] = pointStringToArray(actor.destination);
@@ -261,7 +319,10 @@ function moveActor(actor) {
       actor.x -= ACTOR_STEP_LENGTH
     }
   }
+}
 
+function distanceBetween(x1, y1, x2, y2){
+    return Math.sqrt(Math.pow((x1-x2),2) + Math.pow((y1-y2),2));
 }
 
 function getRandomElement(array){
