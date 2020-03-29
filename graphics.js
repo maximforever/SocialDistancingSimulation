@@ -1,7 +1,7 @@
-let canvas = document.getElementById("canvas");
-let ctx = canvas.getContext('2d');
-let WIDTH = canvas.width;
-let HEIGHT = canvas.height;
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext('2d');
+const WIDTH = canvas.width;
+const HEIGHT = canvas.height;
 
 
 function drawBackground(){
@@ -65,8 +65,8 @@ function text(text, x, y, size, color, centerAlign){
 
 function line(x1, y1, x2, y2){
     ctx.beginPath();
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = "yellow";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#d1d097";
     ctx.moveTo(x1,y1);
     ctx.lineTo(x2,y2);
     ctx.stroke();
