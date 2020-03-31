@@ -14,6 +14,7 @@ const NUMBER_OF_ACTORS = 1;
 const ACTOR_STEP_LENGTH = 1;
 const CHANCE_OF_CONTRACTING_DISEASE = 1;
 let nextActorDestination = "";
+let selectedActor = {};
 
 const SHOW_STREET_COORDINATES = true;
 
@@ -203,13 +204,13 @@ function checkDestinationSelect(clickedX, clickedY){
     let [x,y] = pointStringToArray(point);
 
     if(distanceBetween(clickedX, clickedY, x, y) < SEGMENT_LENGTH/3){
-      console.log(`clicked on ${point}`);
       nextActorDestination = point;
 
       actors.forEach((actor) => {
         if(actor.selected){
           actor.destination = nextActorDestination;
           nextActorDestination = "";
+          console.log(`Set destination to ${actor.destination}`);
         }
       });
     }
@@ -217,11 +218,13 @@ function checkDestinationSelect(clickedX, clickedY){
 }
 
 function checkActorSelect(clickedX, clickedY){
+  selectedActor = {};
   actors.forEach((actor) => {
     if(distanceBetween(clickedX, clickedY, actor.x, actor.y) < SEGMENT_LENGTH/3){
+      selectedActor = actor;
       actor.selected = true;
       nextActorDestination = "";
-    } else {
+    } else {  
       actor.selected = false;
     }
   });
@@ -247,7 +250,16 @@ function drawOneStreet(startPoint, endPoint){
   const [x2, y2] = pointStringToArray(endPoint)
 
   line(x1, y1, x2, y2, "#d1d097");
-  circle(x1, y1, 3, "orange")
+
+  if(Object.keys(selectedActor).length){
+    if(selectedActor.pointsToAvoid.includes(startPoint)){
+      circle(x1, y1, 3, "red");
+    } else {
+      circle(x1, y1, 3, "orange");
+    }
+  }
+
+  
 
   if(SHOW_STREET_COORDINATES){
     text(`${x2}, ${y2}`, x2-20, y2-10, 10, "orange"); 
@@ -336,35 +348,7 @@ function moveActors(){
 }
 
 function moveActor(actor) {
-  const allPoints = Object.keys(points);
-  const currentLocation = `${actor.x},${actor.y}`;
-  let availablePoints = [];
-
-  if(allPoints.includes(currentLocation) || (actor.nextPoint.length == 0)){
-    
-    /* TODO: this is a band aid! Need to figure out actual nextPoint */    
-
-    availablePoints = points[currentLocation].filter((point) => {
-      return !actor.pointsToAvoid.includes(point);
-    });
-
-    if(availablePoints.length <= 1){
-      if(!actor.pointsToAvoid.includes(currentLocation)){
-        actor.pointsToAvoid.push(currentLocation);  // if this is a point with only 1 option, avoid it
-      }
-    } 
-
-    if(availablePoints.length == 0){ // worst case, this shouldn't happen;
-      console.log(points[currentLocation]);
-      availablePoints = points[currentLocation];
-    }  
-
-    if(allPoints.includes(currentLocation)){ 
-      actor.lastVisitedPoint = currentLocation;
-    }   
-
-    actor.nextPoint = getRandomElement(availablePoints);
-  }
+  setNextMove(actor);
 
   let [nextX, nextY] = pointStringToArray(actor.nextPoint);
 
@@ -383,6 +367,70 @@ function moveActor(actor) {
       actor.x -= ACTOR_STEP_LENGTH
     }
   }
+}
+
+function setNextMove(actor){
+  const allPoints = Object.keys(points);
+  const currentLocation = `${actor.x},${actor.y}`;
+  let availablePoints = [];
+
+  if(allPoints.includes(currentLocation) || (actor.nextPoint.length == 0)){
+    /* get available points */
+    availablePoints = points[currentLocation].filter((point) => {
+      return !actor.pointsToAvoid.includes(point);
+    });
+
+    /* record any dead ends */
+    if(availablePoints.length <= 1){
+      if(!actor.pointsToAvoid.includes(currentLocation)){
+        actor.pointsToAvoid.push(currentLocation);  // if this is a point with only 1 option, avoid it
+      }
+    } 
+
+    /* move the actor anyway if there's nowhere to go */
+    if(availablePoints.length == 0){ // worst case, this shouldn't happen;
+      console.log(points[currentLocation]);
+      availablePoints = points[currentLocation];
+    }   
+
+    if(actor.destination == currentLocation){
+      console.log("DESTINATION REACHED!");
+      actor.destination = "";
+      actor.pointsToAvoid = [];
+    }
+
+    if(actor.destination.length){
+      actor.nextPoint = getNextPointClosestToDestination(actor, availablePoints);
+    } else {
+      /*wander aimlessly*/
+      actor.nextPoint = getRandomElement(availablePoints);
+    }
+  }
+}
+
+function getNextPointClosestToDestination(actor, availablePoints){
+  let possiblePoints = [];
+  let bestDistance = WIDTH*HEIGHT;
+  const [destinationX, destinationY] = pointStringToArray(actor.destination);
+  const currentDistanceToDestination = distanceBetween(destinationX, destinationY, actor.x, actor.y);
+
+  availablePoints.forEach((point) => {
+    const [pointX, pointY] = pointStringToArray(point);
+    const distanceToDestination = distanceBetween(destinationX, destinationY, pointX, pointY);
+    if(distanceToDestination < bestDistance){
+      bestDistance = distanceToDestination;
+      possiblePoints = [point];
+    } else if (distanceToDestination == bestDistance){
+      possiblePoints.push(point);
+    }
+  });
+
+  // if the best we could do is move *away* from the destination, let's not come back here
+  if(bestDistance > currentDistanceToDestination){
+    actor.pointsToAvoid.push(`${actor.x},${actor.y}`);
+  }
+
+  return getRandomElement(possiblePoints);
 }
 
 function distanceBetween(x1, y1, x2, y2){
