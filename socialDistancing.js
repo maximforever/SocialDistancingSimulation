@@ -318,7 +318,7 @@ function createActor() {
     color: "#26ff6b",
     infected: (Math.random() < 0.1) ? true :false,
     selected: false,
-    lastVisitedPoint: `${x},${y}`,
+    pointsToAvoid: [],
     nextPoint: "",
     destination: "",
   });
@@ -344,13 +344,20 @@ function moveActor(actor) {
     
     /* TODO: this is a band aid! Need to figure out actual nextPoint */    
 
-    if(points[currentLocation].length > 1){
-      availablePoints = points[currentLocation].filter((possibleOption) => {
-        return possibleOption != actor.lastVisitedPoint;
-      });
-    } else {
+    availablePoints = points[currentLocation].filter((point) => {
+      return !actor.pointsToAvoid.includes(point);
+    });
+
+    if(availablePoints.length <= 1){
+      if(!actor.pointsToAvoid.includes(currentLocation)){
+        actor.pointsToAvoid.push(currentLocation);  // if this is a point with only 1 option, avoid it
+      }
+    } 
+
+    if(availablePoints.length == 0){ // worst case, this shouldn't happen;
+      console.log(points[currentLocation]);
       availablePoints = points[currentLocation];
-    }
+    }  
 
     if(allPoints.includes(currentLocation)){ 
       actor.lastVisitedPoint = currentLocation;
