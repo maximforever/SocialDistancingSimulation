@@ -63,10 +63,10 @@ function text(text, x, y, size, color, centerAlign){
     ctx.fillText(text, x, y);
 }
 
-function line(x1, y1, x2, y2){
+function line(x1, y1, x2, y2, color){
     ctx.beginPath();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = "#d1d097";
+    ctx.strokeStyle = color;
     ctx.moveTo(x1,y1);
     ctx.lineTo(x2,y2);
     ctx.stroke();

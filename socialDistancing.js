@@ -10,11 +10,12 @@ const MAX_STREET_LENGTH = 10;
 
 let actors = [];
 let enableMoveActors = true;
-const NUMBER_OF_ACTORS = 50;
+const NUMBER_OF_ACTORS = 1;
 const ACTOR_STEP_LENGTH = 1;
 const CHANCE_OF_CONTRACTING_DISEASE = 1;
+let nextActorDestination = "";
 
-const SHOW_STREET_COORDINATES = false;
+const SHOW_STREET_COORDINATES = true;
 
 
 const opposite = {
@@ -166,9 +167,9 @@ function pointStringToArray(str){
 
 
 function init(){
-    registerKeyListener();
+    registerEventListeners();
     generateStreets(NUMBER_OF_STREETS);
-    createActors(NUMBER_OF_ACTORS);
+    createAllActors(NUMBER_OF_ACTORS);
     draw();
     setInterval(draw, ANIMATION_SPEED);
 }
@@ -184,11 +185,51 @@ function draw(){
     infect();
 }
 
-function registerKeyListener() {
+function registerEventListeners() {
   window.addEventListener('keydown', (e) => {
     if(event.which == 32){
       enableMoveActors = !enableMoveActors;
     }
+  });
+
+  document.getElementById("canvas").addEventListener('click', (e) => {
+    checkDestinationSelect(e.clientX, e.clientY);
+    checkActorSelect(e.clientX, e.clientY);
+  });
+}
+
+function checkDestinationSelect(clickedX, clickedY){
+  Object.keys(points).forEach((point) => {
+    let [x,y] = pointStringToArray(point);
+
+    if(distanceBetween(clickedX, clickedY, x, y) < SEGMENT_LENGTH/3){
+      console.log(`clicked on ${point}`);
+      nextActorDestination = point;
+
+      actors.forEach((actor) => {
+        if(actor.selected){
+          actor.destination = nextActorDestination;
+          nextActorDestination = "";
+        }
+      });
+    }
+  });
+}
+
+function checkActorSelect(clickedX, clickedY){
+  actors.forEach((actor) => {
+    if(distanceBetween(clickedX, clickedY, actor.x, actor.y) < SEGMENT_LENGTH/3){
+      actor.selected = true;
+      nextActorDestination = "";
+    } else {
+      actor.selected = false;
+    }
+  });
+}
+
+function unselectAllActors(){
+  actors.forEach((actor) => {
+    actor.selected = false;
   });
 }
 
@@ -205,20 +246,33 @@ function drawOneStreet(startPoint, endPoint){
   const [x1, y1] = pointStringToArray(startPoint)
   const [x2, y2] = pointStringToArray(endPoint)
 
-  line(x1, y1, x2, y2);
+  line(x1, y1, x2, y2, "#d1d097");
   circle(x1, y1, 3, "orange")
 
   if(SHOW_STREET_COORDINATES){
-    text(`${x2}, ${y2}`, x2-20, y2-10, 10, "orange")
-    text(`${points[endPoint].length}`, x2-10, y2+10, 10, "orange")    
+    text(`${x2}, ${y2}`, x2-20, y2-10, 10, "orange"); 
   } 
 }
 
 function drawActors(){
   actors.forEach((actor) => {
-    const color = actor.infected ? "#ff0f2f" : "#26ff6b";
-    circle(actor.x, actor.y, PERSON_SIZE, color);
+    drawActor(actor);
   })
+}
+
+function drawActor(actor){
+  if(actor.selected){
+    actor.color = "#2f24ff";
+  } else {
+    actor.color = actor.infected ? "#ff0f2f" : "#26ff6b";
+  }
+
+  if(actor.nextPoint){
+    const [x, y] = pointStringToArray(actor.nextPoint);
+    line(actor.x, actor.y, x, y, actor.color);
+  }
+
+  circle(actor.x, actor.y, PERSON_SIZE, actor.color);
 }
 
 function infect(){
@@ -249,20 +303,23 @@ function infect(){
 /* TODO: make this into its own class */
 
 
-function createActors(numberOfActors){
+function createAllActors(numberOfActors){
   for(let i = 0; i < numberOfActors; i++){
-    createNewActor();
+    createActor();
   }
 }
 
-function createNewActor() {
+function createActor() {
   const [x, y] = pointStringToArray(pickRandomStartingPoint());
   actors.push({
     id: actors.length + 1,
     x: x,
     y: y,
+    color: "#26ff6b",
     infected: (Math.random() < 0.1) ? true :false,
+    selected: false,
     lastVisitedPoint: `${x},${y}`,
+    nextPoint: "",
     destination: "",
   });
 }
@@ -275,7 +332,7 @@ function pickRandomStartingPoint(){
 function moveActors(){
   actors.forEach((actor) => {
     moveActor(actor);
-  })
+  });
 }
 
 function moveActor(actor) {
@@ -283,9 +340,9 @@ function moveActor(actor) {
   const currentLocation = `${actor.x},${actor.y}`;
   let availablePoints = [];
 
-  if(allPoints.includes(currentLocation) || (actor.destination.length == 0)){
+  if(allPoints.includes(currentLocation) || (actor.nextPoint.length == 0)){
     
-    /* TODO: this is a band aid! Need to figure out actual destination */    
+    /* TODO: this is a band aid! Need to figure out actual nextPoint */    
 
     if(points[currentLocation].length > 1){
       availablePoints = points[currentLocation].filter((possibleOption) => {
@@ -299,10 +356,10 @@ function moveActor(actor) {
       actor.lastVisitedPoint = currentLocation;
     }   
 
-    actor.destination = getRandomElement(availablePoints);
+    actor.nextPoint = getRandomElement(availablePoints);
   }
 
-  let [nextX, nextY] = pointStringToArray(actor.destination);
+  let [nextX, nextY] = pointStringToArray(actor.nextPoint);
 
   if(nextX == actor.x){
     if(nextY > actor.y) {
